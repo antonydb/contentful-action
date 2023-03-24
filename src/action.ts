@@ -4,7 +4,7 @@ import { runMigration } from "contentful-migration/built/bin/cli";
 import { readdir } from "fs";
 import path from "path";
 import { promisify } from "util";
-import toSemver from 'to-semver'
+import toSemver from "to-semver";
 
 import {
   CONTENTFUL_ALIAS,
@@ -83,15 +83,36 @@ export const runAction = async (space): Promise<void> => {
   );
 
   Logger.verbose("Set default locale to new environment");
-  const defaultLocale = (await environment.getLocales()).items.find(
-    (locale) => locale.default
-  ).code;
+
+  let defaultLocale: string;
+  count = 0;
+  while (count < MAX_NUMBER_OF_TRIES) {
+    try {
+      const locales = await environment.getLocales();
+
+      Logger.success(
+        `Successfully retrieved locales: ${locales.items.map(({ code }) => code).join(', ')}`
+      );
+
+      defaultLocale = locales.items.find((locale) => locale.default).code;
+      break;
+    } catch (error) {
+      Logger.warn("Retrying retrieval of locales");
+      await delay();
+      count++;
+    }
+  }
+
+  if (!defaultLocale) {
+    throw new Error("Unable to set default locale to new environment");
+  }
 
   Logger.verbose("Read all the available migrations from the file system");
   // Check for available migrations
   // Migration scripts need to be sorted in order to run without conflicts
   const availableMigrations = toSemver(
-    (await readdirAsync(MIGRATIONS_DIR)).map((file) => filenameToVersion(file)), {clean: false}
+    (await readdirAsync(MIGRATIONS_DIR)).map((file) => filenameToVersion(file)),
+    { clean: false }
   ).reverse();
 
   Logger.verbose(
@@ -122,9 +143,8 @@ export const runAction = async (space): Promise<void> => {
     storedVersionEntry.fields[VERSION_FIELD][defaultLocale];
 
   Logger.verbose("Evaluate which migrations to run");
-  const currentMigrationIndex = availableMigrations.indexOf(
-    currentVersionString
-  );
+  const currentMigrationIndex =
+    availableMigrations.indexOf(currentVersionString);
 
   // If the migration can't be found
   // Then abort

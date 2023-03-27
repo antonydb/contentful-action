@@ -21,24 +21,15 @@ utilize Contentful Environments inside your continuous delivery pipeline.
 ## Usage
 
 This action runs migrations on your contentful space. Please add your migration scripts to a directory called
-`migrations` *(configurable)* and name them `[version].js` where `[version]` is the current version of your content-model.
-Versions can be integers or [Semantic versions (semver)](https://semver.org/)  
-Example: `1.js`, `2.js`,`2.0.1-alpha.js`,`2.0.1-rc.js`,`2.0.1-rc.1.js`,`2.0.1-rc.2.js`, `2.0.1.js` ...  
+`migrations` *(configurable)*.
 
-We recommend to not mix integers with semver but as long as they are unique it will work. `2` is the same version as 
-`2.0`and `2.0.0`, therefore it can cause errors if you have several versions that are considered the same.
-
-![Screenshot of Contentful Version Tracking Entry](images/version-tracking.png)
-
-You can choose the initial version. For simplicity, we recommend to start with `1`. Please create `1.js` inside your
-migrations folder and include the following code:
+Please create a JavaScript file inside your migrations folder and include the following code:
 
 ```js
 module.exports = function () {};
 ```
 
-For every new version we can now increase the version (`2.js`, `3.js`, ...). Per default, this action looks for a
-directory labeled `migrations` but it's configurable via the arg `migrations_dir`.
+This action looks for a directory labeled `migrations` but it's configurable via the arg `migrations_dir`.
 
 Next we can adjust our workflow file to use this action. You have to include your `space_id` and `management_api_key`
 from your Contentful space.
@@ -97,9 +88,8 @@ delete_feature           | `boolean` | No  | `false` | Deletes sandbox environme
 set_alias                | `boolean` | No  | `false` | Aliases master the new master environment
 master_pattern           | `string`  | No  | `master-[YYYY]-[MM]-[DD]-[hh][mm]` | The pattern that should be used for the new master environment on contentful
 feature_pattern          | `string`  | No  | `GH-[branch]` | The pattern that should be used for the new feature environments on contentful
-version_content_type     | `string`  | No  | `versionTracking` | The content-type that tracks the version
-version_field            | `string`  | No  | `version` | The field-id that carries the version number
 migrations_dir           | `string`  | No  | `migrations` | The directory to look for migrations
+github_token             | `string`  | Yes  | `undefined` | A GitHub personal access token
 
 
 ## Workflow
@@ -115,8 +105,6 @@ Please look at the [demo file](.github/workflows/main.yml).
     # set_alias: true
     # master_pattern: "main-[YY]-[MM]-[DD]-[hh]-[mm]"
     # feature_pattern: "sandbox-[branch]"
-    # version_field: versionCounter
-    # version_content_type: environmentVersion
     # migrations_dir: contentful/migrations
     space_id: ${{ secrets.SPACE_ID }}
     management_api_key: ${{ secrets.MANAGEMENT_API_KEY }}

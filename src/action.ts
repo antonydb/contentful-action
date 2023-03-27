@@ -8,7 +8,8 @@ import {
   DELETE_FEATURE,
   SET_ALIAS,
   FEATURE_PATTERN,
-  spaceId,
+  SPACE_ID,
+  MANAGEMENT_API_KEY,
 } from './constants';
 import {
   getBranchNames,
@@ -20,17 +21,9 @@ import {
 } from './utils';
 import { Space } from 'contentful-management';
 
-const defaults = {
-  migrationDir: 'migrations',
-};
+const migrationDir = process.env.INPUT_MIGRATIONS_DIR || 'migrations';
 
-const githubWorkspace = process.env.GITHUB_WORKSPACE;
-const managementApiKey = process.env.INPUT_MANAGEMENT_API_KEY;
-const migrationDirName =
-  process.env.INPUT_MIGRATIONS_DIR || defaults.migrationDir;
-const migrationDirPath = path.join(githubWorkspace, migrationDirName);
-
-export const maxRetries = 10;
+const { error: err, info, log, success, verbose, warn }  = Logger
 
 /**
  *
@@ -40,27 +33,25 @@ export const runAction = async (space: Space): Promise<void> => {
   const branchNames = getBranchNames();
   const context = github.context;
 
-  // Get list of changed files in the commit
   const githubToken = core.getInput('github_token');
-
   const octokit = github.getOctokit(githubToken);
 
-  let response;
-
+  // Get list of changed files in the commit
+  let changedFiles: string[] = [];
   try {
-    response = await octokit.repos.compareCommits({
+    const response = await octokit.repos.compareCommits({
       owner: context.repo.owner,
       repo: context.repo.repo,
       head: branchNames.headRef,
       base: branchNames.baseRef,
     });
+
+    changedFiles = response.data.files.map((file) => file.filename);
   } catch (error) {
-    throw new Error(error, { cause: error });
+    throw new Error(error);
   }
 
-  const changedFiles = response.data.files.map((file) => file.filename);
-
-  Logger.info(`Changed files: ${JSON.stringify(changedFiles)}`);
+  info(`Changed files: ${JSON.stringify(changedFiles)}`);
 
   const { environmentId, environment, environmentType } = await getEnvironment(
     space,
@@ -69,18 +60,16 @@ export const runAction = async (space: Space): Promise<void> => {
 
   const { status } = await retryAsync<ReturnType<typeof getEnvironmentStatus>>(
     () => getEnvironmentStatus(space, environment),
-    maxRetries
+    10
   );
 
   if (status === 'ready') {
-    Logger.success(
-      `Successfully processed new environment: "${environmentId}"`
-    );
+    success(`Successfully created new environment: "${environmentId}"`);
   } else {
-    Logger.warn('Environment creation failed');
+    warn('Environment creation failed');
   }
 
-  Logger.verbose('Update API Keys to allow access to new environment');
+  verbose('Update API Keys to allow access to new environment');
   const newEnv = {
     sys: {
       type: 'Link',
@@ -92,50 +81,53 @@ export const runAction = async (space: Space): Promise<void> => {
   const { items: keys } = await space.getApiKeys();
   await Promise.all(
     keys.map((key) => {
-      Logger.verbose(`Updating: "${key.sys.id}"`);
+      verbose(`Updating: "${key.sys.id}"`);
       key.environments.push(newEnv);
       return key.update();
     })
   );
 
-  Logger.verbose('Read all the available migrations from the file system');
+  verbose('Read all the available migrations from the file system');
   const migrationOptions = {
-    spaceId,
+    spaceId: SPACE_ID,
     environmentId,
-    accessToken: managementApiKey,
+    accessToken: MANAGEMENT_API_KEY,
     yes: true,
   };
 
   const filesToMigrate = changedFiles.filter(
-    (file) => file.indexOf(`${migrationDirName}/`) === 0
+    (file) => file.indexOf(`${migrationDir}/`) === 0
   );
 
-  // Allow mutations
   for (let filePath of filesToMigrate) {
-    Logger.verbose(`Running ${filePath}`);
-    await runMigration({ ...migrationOptions, filePath: path.resolve(filePath) });
-    Logger.success(`Migration script ${filePath}.js succeeded`);
+    verbose(`Running ${filePath}`);
+    await runMigration({
+      ...migrationOptions,
+      filePath: path.resolve(filePath),
+    });
+    success(`Migration script ${filePath}.js succeeded`);
   }
 
-  Logger.log(`Checking if we need to update ${CONTENTFUL_ALIAS} alias`);
+  log(`Checking if we need to update ${CONTENTFUL_ALIAS} alias`);
   // If the environmentType is ${CONTENTFUL_ALIAS} ("master")
   // Then set the alias to the new environment
   // Else inform the user
 
   if (environmentType === CONTENTFUL_ALIAS && SET_ALIAS) {
-    Logger.log(`Running on ${CONTENTFUL_ALIAS}.`);
-    Logger.log(`Updating ${CONTENTFUL_ALIAS} alias.`);
-    await space
-      .getEnvironmentAlias(CONTENTFUL_ALIAS)
-      .then((alias) => {
-        alias.environment.sys.id = environmentId;
-        return alias.update();
-      })
-      .then((alias) => Logger.success(`alias ${alias.sys.id} updated.`))
-      .catch(Logger.error);
+    log(`Running on ${CONTENTFUL_ALIAS}.`);
+    log(`Updating ${CONTENTFUL_ALIAS} alias.`);
+
+    try {
+      const alias = await space.getEnvironmentAlias(CONTENTFUL_ALIAS);
+      alias.environment.sys.id = environmentId;
+      await alias.update();
+      success(`alias ${alias.sys.id} updated.`);
+    } catch (error) {
+      err(error);
+    }
   } else {
-    Logger.verbose('Running on feature branch');
-    Logger.verbose('No alias changes required');
+    verbose('Running on feature branch');
+    verbose('No alias changes required');
   }
 
   // If the sandbox environment should be deleted
@@ -151,12 +143,12 @@ export const runAction = async (space: Space): Promise<void> => {
       const environmentIdToDelete = getNameFromPattern(FEATURE_PATTERN, {
         branchName: branchNames.headRef,
       });
-      Logger.log(`Delete the environment: ${environmentIdToDelete}`);
+      log(`Delete the environment: ${environmentIdToDelete}`);
       const environment = await space.getEnvironment(environmentIdToDelete);
       await environment?.delete();
-      Logger.success(`Deleted the environment: ${environmentIdToDelete}`);
+      success(`Deleted the environment: ${environmentIdToDelete}`);
     } catch (error) {
-      Logger.error('Cannot delete the environment');
+      err('Cannot delete the environment');
     }
   }
 
@@ -166,5 +158,5 @@ export const runAction = async (space: Space): Promise<void> => {
     `https://app.contentful.com/spaces/${space.sys.id}/environments/${environmentId}`
   );
   core.setOutput('environment_name', environmentId);
-  Logger.success('🚀 All done 🚀');
+  success('🚀 All done 🚀');
 };

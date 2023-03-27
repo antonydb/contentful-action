@@ -1,5 +1,5 @@
 name: 'Contentful Action'
-description: 'Run a Migration against your Contentful space'
+description: 'Run a migration against your Contentful space'
 inputs:
   delete_feature:
     description: "The head branch will be deleted after it was merged"

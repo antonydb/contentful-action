@@ -25,7 +25,7 @@ jobs:
         migrations_dir: test-migrations
         space_id: ${{ secrets.SPACE_ID }}
         management_api_key: ${{ secrets.MANAGEMENT_API_KEY }}
-        github_token: ""
+        github_token: ${{ secrets.GITHUB_TOKEN }}
       env:
         LOG_LEVEL: verbose
 

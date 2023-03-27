@@ -5,7 +5,7 @@ import { Space } from 'contentful-management/dist/typings/entities/space';
 import {
   CONTENTFUL_ALIAS,
   FEATURE_PATTERN,
-  logLevel,
+  LOG_LEVEL,
   MASTER_PATTERN,
 } from './constants';
 import {
@@ -18,7 +18,7 @@ import {
 // Force colors on github
 chalk.level = 3;
 
-const stringifyObject = (obj) => JSON.stringify(obj, null, 2);
+const stringifyObject = (obj: any) => JSON.stringify(obj, null, 2);
 
 export const Logger = {
   log(message: string) {
@@ -37,18 +37,12 @@ export const Logger = {
     console.log('ℹ️', chalk.blue(message));
   },
   verbose(message: string) {
-    if (logLevel === 'verbose') {
+    if (LOG_LEVEL === 'verbose') {
       console.log(chalk.white(message));
     }
   },
 };
 
-/**
- * Promise based delay
- * @param time
- */
-export const delay = (time = 3000): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, time));
 
 /**
  * Convert a branchName to a valid environmentName
@@ -263,13 +257,17 @@ export async function getEnvironmentStatus(
     return Promise.reject({ status });
   }
 
-  return Promise.reject({ status: 'waiting' });
+  return Promise.reject({ status: 'initializing' });
 }
 
 export function retryAsync<T>(
   asyncFunc: () => T,
-  maxRetries: number
+  maxRetries: number,
+  delayMs: number = 3000
 ): Promise<T> {
+  const delay = (time: number): Promise<void> =>
+    new Promise((resolve) => setTimeout(resolve, time));
+
   return new Promise((resolve, reject) => {
     let retryCount = 0;
 
@@ -283,7 +281,7 @@ export function retryAsync<T>(
         } else {
           retryCount++;
           Logger.log(`Retrying (${retryCount}/${maxRetries})...`);
-          await delay();
+          await delay(delayMs);
           tryAsyncFunc();
         }
       }

@@ -8,7 +8,6 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     name: Contentful Migration Example
     steps:
@@ -23,11 +22,10 @@ jobs:
         set_alias: true
         master_pattern: "prod-[DD].[MM].[YYYY]-[hh][mm][ss]"
         feature_pattern: "sandbox-[branch]"
-        version_field: version
-        version_content_type: versionTracking
         migrations_dir: test-migrations
         space_id: ${{ secrets.SPACE_ID }}
         management_api_key: ${{ secrets.MANAGEMENT_API_KEY }}
+        github_token: ""
       env:
         LOG_LEVEL: verbose
 

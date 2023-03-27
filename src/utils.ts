@@ -1,38 +1,43 @@
-import * as github from "@actions/github";
-import chalk from "chalk";
-import { Space } from "contentful-management/dist/typings/entities/space";
+import * as github from '@actions/github';
+import chalk from 'chalk';
+import { Environment } from 'contentful-management';
+import { Space } from 'contentful-management/dist/typings/entities/space';
 import {
   CONTENTFUL_ALIAS,
-  DELAY,
   FEATURE_PATTERN,
-  LOG_LEVEL,
+  logLevel,
   MASTER_PATTERN,
-} from "./constants";
+} from './constants';
 import {
   BranchNames,
   EnvironmentProps,
   EventNames,
   NameFromPatternArgs,
-} from "./types";
+} from './types';
 
 // Force colors on github
 chalk.level = 3;
 
+const stringifyObject = (obj) => JSON.stringify(obj, null, 2);
+
 export const Logger = {
-  log(message) {
+  log(message: string) {
     console.log(chalk.white(message));
   },
-  success(message) {
-    console.log("✅", chalk.green(message));
+  success(message: string) {
+    console.log('✅', chalk.green(message));
   },
-  error(message) {
-    console.log("💩", chalk.red(message));
+  error(message: string) {
+    console.log('💩', chalk.red(message));
   },
-  warn(message) {
-    console.log("⚠️", chalk.yellow(message));
+  warn(message: string) {
+    console.log('⚠️', chalk.yellow(message));
   },
-  verbose(message) {
-    if (LOG_LEVEL === "verbose") {
+  info(message: string) {
+    console.log('ℹ️', chalk.blue(message));
+  },
+  verbose(message: string) {
+    if (logLevel === 'verbose') {
       console.log(chalk.white(message));
     }
   },
@@ -42,59 +47,54 @@ export const Logger = {
  * Promise based delay
  * @param time
  */
-export const delay = (time = DELAY): Promise<void> =>
+export const delay = (time = 3000): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, time));
-
-/**
- * Convert fileNames to versions
- * @example
- * filenameToVersion("1.js") // "1"
- * filenameToVersion("1.0.1.js") // "1.0.1"
- */
-export const filenameToVersion = (file: string): string =>
-  file.replace(/\.js$/, "").replace(/_/g, ".");
-
-/**
- * Convert versions to filenames
- * @example
- * versionToFilename("1") // "1.js"
- * versionToFilename("1.0.1") // "1.0.1.js"
- */
-export const versionToFilename = (version: string): string =>
-  `${version.replace(/\\./g, "_")}.js`;
 
 /**
  * Convert a branchName to a valid environmentName
  * @param branchName
  */
-export const branchNameToEnvironmentName = (branchName: string): string =>
-  branchName.replace(/[\/_.]/g, "-");
+export const branchNameToEnvironmentName = (branchName: string): string => {
+  Logger.success(`branchNameToEnvironmentName function`);
+  Logger.info(`branchName: ${branchName}`);
+  try {
+    const newBranchName = branchName.replace(/[\/_.]/g, '-');
+    return newBranchName;
+  } catch (e) {
+    console.trace('branchNameToEnvironmentName error', e);
+    throw new Error(e);
+  }
+};
 
 export enum Matcher {
-  YY = "YY",
-  YYYY = "YYYY",
-  MM = "MM",
-  DD = "DD",
-  hh = "hh",
-  mm = "mm",
-  ss = "ss",
-  branch = "branch",
+  YY = 'YY',
+  YYYY = 'YYYY',
+  MM = 'MM',
+  DD = 'DD',
+  hh = 'hh',
+  mm = 'mm',
+  ss = 'ss',
+  branch = 'branch',
 }
 
 export const matchers = {
   [Matcher.ss]: (date: Date): string =>
-    `${date.getUTCSeconds()}`.padStart(2, "0"),
+    `${date.getUTCSeconds()}`.padStart(2, '0'),
   [Matcher.hh]: (date: Date): string =>
-    `${date.getUTCHours()}`.padStart(2, "0"),
+    `${date.getUTCHours()}`.padStart(2, '0'),
   [Matcher.mm]: (date: Date): string =>
-    `${date.getUTCMinutes()}`.padStart(2, "0"),
+    `${date.getUTCMinutes()}`.padStart(2, '0'),
   [Matcher.YYYY]: (date: Date): string => `${date.getUTCFullYear()}`,
   [Matcher.YY]: (date: Date): string => `${date.getUTCFullYear()}`.substr(2, 2),
   [Matcher.MM]: (date: Date): string =>
-    `${date.getUTCMonth() + 1}`.padStart(2, "0"),
-  [Matcher.DD]: (date: Date): string => `${date.getDate()}`.padStart(2, "0"),
-  [Matcher.branch]: (branchName: string): string =>
-    branchNameToEnvironmentName(branchName),
+    `${date.getUTCMonth() + 1}`.padStart(2, '0'),
+  [Matcher.DD]: (date: Date): string => `${date.getDate()}`.padStart(2, '0'),
+  [Matcher.branch]: (branchName: string): string => {
+    Logger.success('matchers[Matcher.branch]');
+    Logger.info(`Matcher.branch ${Matcher.branch}`);
+    Logger.info(`branchName: ${branchName}`);
+    return branchNameToEnvironmentName(branchName);
+  },
 };
 
 /**
@@ -106,6 +106,9 @@ export const getNameFromPattern = (
   pattern: string,
   { branchName }: NameFromPatternArgs = {}
 ): string => {
+  Logger.success(`getNameFromPattern function`);
+  Logger.info(`pattern: ${pattern}`);
+  Logger.info(`branchName: ${branchName}`);
   const date = new Date();
   return pattern.replace(
     /\[(YYYY|YY|MM|DD|hh|mm|ss|branch)]/g,
@@ -136,6 +139,9 @@ export const getBranchNames = (): BranchNames => {
   const { default_branch: defaultBranch } = payload.repository;
 
   // Check the eventName
+  Logger.success('getBranchNames function');
+  Logger.info(`eventName: ${eventName}`);
+  Logger.info(`payload: ${stringifyObject(payload)}`);
   switch (eventName) {
     // If pullRequest we need to get the head and base
     case EventNames.pullRequest:
@@ -148,7 +154,7 @@ export const getBranchNames = (): BranchNames => {
     default:
       return {
         headRef: null,
-        baseRef: payload.ref.replace(/^refs\/heads\//, ""),
+        baseRef: payload.ref.replace(/^refs\/heads\//, ''),
         defaultBranch,
       };
   }
@@ -164,6 +170,9 @@ export const getEnvironment = async (
   space: Space,
   branchNames: BranchNames
 ): Promise<EnvironmentProps> => {
+  Logger.success('getEnvironment function');
+  Logger.info(`space ${stringifyObject(space)}`);
+  Logger.info(`branchNames ${stringifyObject(branchNames)}`);
   const environmentNames = {
     base: branchNameToEnvironmentName(branchNames.baseRef),
     head: branchNames.headRef
@@ -173,22 +182,34 @@ export const getEnvironment = async (
   // If the Pull Request is merged and the base is the repository default_name (master|main, ...)
   // Then create an environment name for the given master_pattern
   // Else create an environment name for the given feature_pattern
-  Logger.verbose(
+  Logger.info(
     `MASTER_PATTERN: ${MASTER_PATTERN} | FEATURE_PATTERN: ${FEATURE_PATTERN}`
   );
+  Logger.info(`branchNames.baseRef: ${branchNames.baseRef}`);
+  Logger.info(`branchNames.defaultBranch: ${branchNames.defaultBranch}`);
+  Logger.info(
+    `github.context.payload: ${stringifyObject(github.context.payload)}`
+  );
+  // github.context.payload.pull_request?.merged... however for testing we're pushing directly to main...
   const environmentType =
     branchNames.baseRef === branchNames.defaultBranch &&
     github.context.payload.pull_request?.merged
       ? CONTENTFUL_ALIAS
-      : "feature";
-
+      : 'feature';
+  Logger.info(`environmentType: ${environmentType}`);
+  Logger.info(`CONTENTFUL_ALIAS: ${CONTENTFUL_ALIAS}`);
+  const isEnvTypeAlias = environmentType === CONTENTFUL_ALIAS;
+  Logger.info(`isEnvTypeAlias: ${isEnvTypeAlias}`);
+  Logger.info(`MASTER_PATTERN: ${MASTER_PATTERN}`);
+  Logger.info(`FEATURE_PATTERN: ${FEATURE_PATTERN}`);
+  Logger.info(`branchNames.headRef: ${branchNames.headRef}`);
   const environmentId =
     environmentType === CONTENTFUL_ALIAS
       ? getNameFromPattern(MASTER_PATTERN)
       : getNameFromPattern(FEATURE_PATTERN, {
           branchName: branchNames.headRef,
         });
-  Logger.verbose(`environmentId: "${environmentId}"`);
+  Logger.info(`environmentId: "${environmentId}"`);
 
   // If environment matches ${CONTENTFUL_ALIAS} ("master")
   // Then return it without further actions
@@ -226,3 +247,48 @@ export const getEnvironment = async (
     }),
   };
 };
+
+export async function getEnvironmentStatus(
+  space: Space,
+  environment: Environment
+): Promise<{ status: 'ready' | 'failed' }> {
+  const status = (await space.getEnvironment(environment.sys.id)).sys.status.sys
+    .id;
+
+  if (status === 'ready') {
+    return Promise.resolve({ status });
+  }
+
+  if (status === 'failed') {
+    return Promise.reject({ status });
+  }
+
+  return Promise.reject({ status: 'waiting' });
+}
+
+export function retryAsync<T>(
+  asyncFunc: () => T,
+  maxRetries: number
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    let retryCount = 0;
+
+    async function tryAsyncFunc() {
+      try {
+        const result = await asyncFunc();
+        resolve(result);
+      } catch (error) {
+        if (retryCount >= maxRetries) {
+          reject(error);
+        } else {
+          retryCount++;
+          Logger.log(`Retrying (${retryCount}/${maxRetries})...`);
+          await delay();
+          tryAsyncFunc();
+        }
+      }
+    }
+
+    tryAsyncFunc();
+  });
+}

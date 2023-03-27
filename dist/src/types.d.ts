@@ -1,4 +1,4 @@
-import { Environment } from "contentful-management/dist/typings/entities/environment";
+import { Environment } from 'contentful-management/dist/typings/entities/environment';
 export declare enum EventNames {
     pullRequest = "pull_request"
 }
@@ -11,7 +11,7 @@ export interface EnvironmentNames {
     base: string;
     head: string | null;
 }
-declare type EnvironmentType = "master" | "feature";
+declare type EnvironmentType = 'master' | 'feature';
 export interface EnvironmentProps {
     environmentType: EnvironmentType;
     environmentNames: EnvironmentNames;

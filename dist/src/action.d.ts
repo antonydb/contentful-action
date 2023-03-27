@@ -1,8 +1,7 @@
-/// <reference types="node" />
-import { readdir } from "fs";
-export declare const readdirAsync: typeof readdir.__promisify__;
+import { Space } from 'contentful-management';
+export declare const maxRetries = 10;
 /**
  *
  * @param space
  */
-export declare const runAction: (space: any) => Promise<void>;
+export declare const runAction: (space: Space) => Promise<void>;

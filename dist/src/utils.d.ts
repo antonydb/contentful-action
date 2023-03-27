@@ -1,31 +1,19 @@
-import { Space } from "contentful-management/dist/typings/entities/space";
-import { BranchNames, EnvironmentProps, NameFromPatternArgs } from "./types";
+import { Environment } from 'contentful-management';
+import { Space } from 'contentful-management/dist/typings/entities/space';
+import { BranchNames, EnvironmentProps, NameFromPatternArgs } from './types';
 export declare const Logger: {
-    log(message: any): void;
-    success(message: any): void;
-    error(message: any): void;
-    warn(message: any): void;
-    verbose(message: any): void;
+    log(message: string): void;
+    success(message: string): void;
+    error(message: string): void;
+    warn(message: string): void;
+    info(message: string): void;
+    verbose(message: string): void;
 };
 /**
  * Promise based delay
  * @param time
  */
 export declare const delay: (time?: number) => Promise<void>;
-/**
- * Convert fileNames to versions
- * @example
- * filenameToVersion("1.js") // "1"
- * filenameToVersion("1.0.1.js") // "1.0.1"
- */
-export declare const filenameToVersion: (file: string) => string;
-/**
- * Convert versions to filenames
- * @example
- * versionToFilename("1") // "1.js"
- * versionToFilename("1.0.1") // "1.0.1.js"
- */
-export declare const versionToFilename: (version: string) => string;
 /**
  * Convert a branchName to a valid environmentName
  * @param branchName
@@ -68,3 +56,7 @@ export declare const getBranchNames: () => BranchNames;
  * @param branchNames
  */
 export declare const getEnvironment: (space: Space, branchNames: BranchNames) => Promise<EnvironmentProps>;
+export declare function getEnvironmentStatus(space: Space, environment: Environment): Promise<{
+    status: 'ready' | 'failed';
+}>;
+export declare function retryAsync<T>(asyncFunc: () => T, maxRetries: number): Promise<T>;
